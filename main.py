@@ -7,7 +7,6 @@ import os
 import subprocess
 import re
 import time
-import random
 
 # Configuration for JavaScript runtime (adjust path for your system environment)
 js_runtime = {"deno:/usr/bin/deno"}
@@ -141,12 +140,12 @@ def getUrls(playlist_link: str) -> list:
        
     return urls
 
-def processOneUrl(url: str, playlist_archive: str, video_id: str, directory: Path = Path.cwd()) -> None:
+def processOneUrl(url: str, playlist_archive: str, video_id: str, track_num: str, anchor_time : str, directory: Path = Path.cwd()) -> None:
 
     time.sleep(2)
 
     audio = dlAudio(url)
-    time.sleep(random.randint(2,5))
+    time.sleep(3)
     filename = dlThumbnail(url)
     if not filename:
         raise ValueError("Thumbnail file does not exist.")
@@ -159,6 +158,13 @@ def processOneUrl(url: str, playlist_archive: str, video_id: str, directory: Pat
         raise RuntimeError(f"C Program Crashed on {filename}: {e}")
         
     addCoverart(audio, bmp_name, directory)
+
+    final_file_path = os.path.join(directory, audio)
+    if os.path.exists(final_file_path):
+
+        fake_time = anchor_time + track_num
+        
+        os.utime(final_file_path, (fake_time, fake_time))
 
     if os.path.exists(filename): 
         os.remove(filename)
@@ -188,26 +194,26 @@ def worker_wrapper(args):
     This wrapper unpacks the arguments for each process worker 
     and handles crashes so one bad song doesn't kill the whole pool.
     """
-    url, playlist_archive, video_id, directory = args
+    url, playlist_archive, video_id, track_num, anchor_time, directory = args
     try:
-        processOneUrl(url, playlist_archive, video_id, directory)
+        processOneUrl(url, playlist_archive, video_id, track_num, anchor_time, directory)
         return (video_id, True)
     except Exception as e:
         writeExeption(url, str(e))
         return (video_id, False)
 
 def main() -> int:
-
-    playlist_url = "YOUR PLAYLIST URL HERE"
-    save_directory = r"OUTPUT DIRECTORY HERE"
+    playlist_url = "YOUR_PLAYLIST_URL_HERE"
+    save_directory = "OUTPUT DIRECTORY HERE"
     playlist_id = getPlaylistID(playlist_url)
     archive_file = os.path.join(Path.cwd() / "playlist archive",f"{playlist_id}.txt")
     urls_to_download = getUrls(playlist_url)
     done_ids = getExsitingSongIDs(archive_file)
+    cur_time = time.time()
 
     pending_tasks = []
 
-    for url in urls_to_download:
+    for track_num, url in enumerate(urls_to_download):
         try:
             if "v=" in url:
                 video_id = url.split("v=")[1].split("&")[0]
@@ -215,7 +221,7 @@ def main() -> int:
                 video_id = url.split("=")[1]
                 
             if video_id not in done_ids:
-                pending_tasks.append((url, archive_file, video_id, save_directory))
+                pending_tasks.append((url, archive_file, video_id, track_num, cur_time, save_directory))
 
             else:
                 print(f"\033[92m{video_id}\033[0m already exists, moving to next song.")
