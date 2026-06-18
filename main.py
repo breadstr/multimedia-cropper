@@ -34,7 +34,7 @@ def convertThumbnail(thumbnail_name: str) -> str:
 
     return bmp_name
 
-def addCoverart(audio : str, thumbnail : str, directory : str) -> None:
+def addCoverart(audio : str, thumbnail : str, directory : str, track_number: str) -> None:
 
     temp_output = audio + ".tagged.m4a"
 
@@ -44,7 +44,10 @@ def addCoverart(audio : str, thumbnail : str, directory : str) -> None:
         "-i", thumbnail,
         "-map", "0:0",        # Map the audio
         "-map", "1:0",        # Map the image
+        "-map_metadata", "0", # Copy global metadata from the original audio
+        "-map_metadata:s:a", "0:s:a", # Copies stream-specific metadata
         "-c:a", "copy",       # Keep audio as-is
+        '-metadata', f'track={track_number}', # Set track number
         "-c:v", "png",        # Convert BMP to PNG (standard for M4A covers)
         "-disposition:v", "attached_pic", 
         temp_output
@@ -157,7 +160,7 @@ def processOneUrl(url: str, playlist_archive: str, video_id: str, track_num: str
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"C Program Crashed on {filename}: {e}")
         
-    addCoverart(audio, bmp_name, directory)
+    addCoverart(audio, bmp_name, directory, track_num)
 
     final_file_path = os.path.join(directory, audio)
     if os.path.exists(final_file_path):
